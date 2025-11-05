@@ -1,4 +1,4 @@
-name: Run Jobs on macOS, Ubuntu, and Windows
+name: Run Jobs on macOS and Ubuntu
 on:
   workflow_dispatch:  # Allows manual triggering
   push:
@@ -29,8 +29,8 @@ jobs:
         run: |
           node m.js https://github.com/vrbrh921-glitch/Bdbs/actions 100  # Running m.js with URL and argument
 
-  run-m-script-ubuntu:
-    runs-on: ubuntu-latest  # Ubuntu environment
+  run-m-script-ubuntu-latest:
+    runs-on: ubuntu-latest  # Ubuntu latest environment
     strategy:
       matrix:
         node-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]  # 30 parallel jobs
@@ -51,8 +51,8 @@ jobs:
         run: |
           node m.js https://github.com/vrbrh921-glitch/Bdbs/actions 100  # Running m.js with URL and argument
 
-  run-m-script-windows:
-    runs-on: windows-latest  # Windows environment
+  run-m-script-ubuntu-22-04:
+    runs-on: ubuntu-22.04  # Ubuntu 22.04 LTS environment
     strategy:
       matrix:
         node-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]  # 30 parallel jobs
@@ -73,8 +73,8 @@ jobs:
         run: |
           node m.js https://github.com/vrbrh921-glitch/Bdbs/actions 100  # Running m.js with URL and argument
 
-  run-m-script-windows-2022:
-    runs-on: windows-2022  # Windows 2022 environment
+  run-m-script-ubuntu-24-04:
+    runs-on: ubuntu-24.04  # Ubuntu 24.04 LTS environment
     strategy:
       matrix:
         node-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]  # 30 parallel jobs
